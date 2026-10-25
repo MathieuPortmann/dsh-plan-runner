@@ -46,6 +46,7 @@
     "LICENSE"
   ],
   "dsh": {
+    "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
     },
@@ -72,6 +73,5 @@
     "@deepseek-ai/dsh-tools": {
       "optional": true
     }
-  },
-  "manifestVersion": 1
+  }
 }
