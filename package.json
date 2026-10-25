@@ -1,6 +1,6 @@
 {
   "name": "dsh-plan-runner",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Step-by-step plan runner for DeepSeek Harness, built for small local models: each step runs in a fresh child conversation with its own model and access, verified by mechanical checks and an optional read-only reviewer; one retry, then a finer split proposed to the user.",
   "type": "module",
   "license": "MIT",
