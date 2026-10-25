@@ -1,0 +1,77 @@
+{
+  "name": "dsh-plan-runner",
+  "version": "0.1.0",
+  "description": "Step-by-step plan runner for DeepSeek Harness, built for small local models: each step runs in a fresh child conversation with its own model and access, verified by mechanical checks and an optional read-only reviewer; one retry, then a finer split proposed to the user.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Mathieu Portmann",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MathieuPortmann/dsh-plan-runner.git"
+  },
+  "homepage": "https://github.com/MathieuPortmann/dsh-plan-runner#readme",
+  "bugs": {
+    "url": "https://github.com/MathieuPortmann/dsh-plan-runner/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "agent",
+    "planning",
+    "subagents",
+    "local-llm",
+    "ollama"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0",
+    "dsh": ">=0.2.0-rc.2 <0.3.0"
+  },
+  "scripts": {
+    "test": "node --test \"tests/*.test.mjs\""
+  },
+  "exports": {
+    ".": "./index.js",
+    "./plan-tools": "./lib/plan-tools.js",
+    "./plan-file": "./lib/plan-file.js",
+    "./plan-autostart": "./lib/plan-autostart.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-connection"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-llm": ">=0.2.0-rc.2 <0.3.0",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.2 <0.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-llm": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-tools": {
+      "optional": true
+    }
+  },
+  "manifestVersion": 1
+}

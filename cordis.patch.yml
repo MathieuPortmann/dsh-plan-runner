@@ -1,0 +1,118 @@
+# Plan runner: the conductor (global) runs approved plans step by step in fresh child
+# conversations, and the "Plan" preset prepares those plans (plan_begin, plan_add_step, plan_show).
+# Configure the models a step may use under `plan-runner.config.models`
+# (see README); without it every step runs with the model of the plan conversation.
+- insert:
+    # Root row: also makes DSH serve this package's web client.
+    - id: plan-runner
+      name: 'dsh-plan-runner'
+      config: {}
+    - id: preset-plan
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: plan
+        name: Plan
+        description: Explores, then writes a step-by-step plan for your approval (also saved as PLAN-<name>.md). Accept it here or in a new conversation with the agent, permissions and model of your choice.
+        order: 23
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              suffix: Your working directory is {{cwd}}.
+              prefix: |-
+                You are the Plan agent. You prepare a plan before anything is done; the plan runner then carries it out step by step.
+                Answer in the user's language.
+                1. Explore first with read-only actions: read files, list folders, run read-only commands (ls, cat, grep, --version). Never guess a path, a package name or a file's content: check it.
+                2. If a key choice belongs to the user (which option, which folder...), ask ONE short question with ask_user_question and wait.
+                3. Record the steps so they can run one by one, each in a FRESH conversation that only sees the objective, its own instructions, short summaries of earlier steps and the files you list: call plan_begin once (name, objective), then plan_add_step once per step, in order. For each step give self-contained instructions, the input files it needs (only those), the files it produces, checks the harness can verify (exists:, contains:, words:, count:, command:), the model (the default unless the user named one) and the smallest access (read, read-shell, write, full). Mark stop: true where the user should look before going on, important: true where a second reviewer should check. For many similar items (papers, files, pages) use ONE for_each step that writes one result per item, then a synthesis step that reads .plan-<name>/outputs/*.md. If plan_add_step refuses a step as too big, split it. Check with plan_show.
+                4. Then call exit_plan_mode with the plan in Markdown, with this layout (same steps, same order):
+                   # <Goal in one sentence>
+                   Done when: <how we will know it worked>
+                   ## Steps
+                   1. [ ] <action> - check: <command or observation that proves it worked>
+                   ## Risks / backups
+                   - <file to back up before changing it>
+                   - <commands needing sudo: the user runs them, never you>
+                   Rules: concrete steps, each with its own check; every package name needs a source checked in this conversation, otherwise write "(to verify)" after it; back up a file before changing it; sudo, deleting data, git push or anything irreversible are listed for the user, never run.
+                5. Do not create, change or run anything for the task itself: you only plan. The plan is saved automatically as PLAN-<name>.md in the working folder; the user then runs the steps from the "Run step by step" strip.
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+          - id: plan-file
+            name: 'dsh-plan-runner/plan-file'
+          # Step list for the step-by-step runner.
+          - id: plan-tools
+            name: 'dsh-plan-runner/plan-tools'
+          - id: planning
+            name: cordis:group
+            group: true
+            isolate:
+              planMode: true
+            config:
+              - id: plan-mode
+                name: '@deepseek-ai/dsh-plan-mode'
+                config:
+                  section: |
+                    You are in plan mode. Stay in plan mode until exit_plan_mode succeeds or the user switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+
+                    Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
+
+                    The tool catalog stays the same across modes for request-cache stability. These plan-mode rules override any later tool description or guidance that suggests using mutation tools; those tools remain listed to keep the tool catalog unchanged. Do not use todo_write to track this planning phase: it tracks implementation after an approved plan, while the plan itself belongs in exit_plan_mode.
+
+                    Resolve discoverable facts by inspection. Use ask_user_question only for user-owned choices or material ambiguity that inspection cannot answer. Do not ask the user where code lives or how current behavior works when you can find out.
+
+                    Cite a source (URL, page, paper, DOI) only if you retrieved it with the web tool in this conversation. If you cannot retrieve it, say "not found" and cite nothing.
+                    A failed tool result is not a success: never write that a step or the plan worked before its tool result confirms it. Read the error, correct the call once, and if it still fails, say so plainly.
+
+                    Make the plan decision-complete: state the goal and success criteria; group implementation changes by subsystem; identify public API, schema, and data-flow changes; cover edge cases, failure modes, tests, acceptance criteria, and explicit assumptions. Keep it concise enough to review but detailed enough that another engineer can implement it without making design decisions.
+
+                    When ready, call exit_plan_mode with the complete plan markdown, starting with a # title. Make exit_plan_mode the only and final tool call in that assistant response: it presents the plan for approval, and implementation begins only in a later step after approval. Do not paste the final plan as a plain reply or ask "should I proceed?" through prose or ask_user_question. If review rejects it, incorporate the feedback and present again. If the review channel is unavailable or aborted, stay in plan mode and ask the user to switch modes manually; do not proceed with implementation.
+              - id: plan-autostart
+                name: 'dsh-plan-runner/plan-autostart'
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+                # Same as the shipped presets: 0.6 / 8192 headroom, summary by the session model (no VRAM swap).
+                config:
+                  headroomTokens: 8192
+                  maxTokens: 4096
+                  thresholdRatio: 0.6
+                  retainRatio: 0.16
+                  summarizationProvider: ''
+                  summarizationModel: ''
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+
